@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>File Upload Test</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f5f7fa;
+    }
+    main {
+      width: min(500px, 90vw);
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+    }
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    button {
+      background: #0a84ff;
+      color: #fff;
+      border: none;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 12px;
+      border-radius: 8px;
+      max-height: 200px;
+      overflow: auto;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>File Upload</h1>
+    <p>Choose an image and tap upload to send it to Cloudflare R2.</p>
+    <form id="uploadForm" enctype="multipart/form-data">
+      <label>
+        <span>Image</span>
+        <input type="file" name="file" accept="image/*" required />
+      </label>
+      <button type="submit">Upload</button>
+    </form>
+    <pre id="result">Awaiting upload...</pre>
+  </main>
+  <script>
+    const form = document.querySelector('#uploadForm');
+    const output = document.querySelector('#result');
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const data = new FormData(form);
+      output.textContent = 'Uploading...';
+      try {
+        const response = await fetch('/upload', {
+          method: 'POST',
+          body: data,
+        });
+        const payload = await response.json();
+        output.textContent = JSON.stringify(payload, null, 2);
+      } catch (error) {
+        output.textContent = error.toString();
+      }
+    });
+  </script>
+</body>
+</html>

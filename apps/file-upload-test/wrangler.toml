@@ -1,0 +1,9 @@
+name = "file-upload-test"
+main = "./src/index.ts"
+compatibility_date = "2025-11-24"
+workers_dev = true
+type = "javascript"
+
+[[r2_buckets]]
+binding = "UPLOAD_BUCKET"
+bucket_name = "file-upload-test"
