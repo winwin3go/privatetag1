@@ -6,7 +6,7 @@ Media upload and serve abstraction for R2 skeleton.
 
 - **Endpoints**:
   - `POST /media` → accepts file stream + metadata `{ tagId, contentType }`, returns `{ mediaId }`.
-  - `GET /media/{mediaId}` → streams binary payload; policy enforced via `svc/st-idp` token introspection.
+  - `GET /media/{mediaId}` → streams binary payload from R2; policy enforcement TBD once `svc/st-idp` integrates.
   - `DELETE /media/{mediaId}` → tombstone operation emitting audit entry.
 - **Bindings**: Cloudflare R2 bucket, KV for presigned URLs, optional Durable Object for upload coordination.
 - **Dependencies**: Validates TagID with `svc/tag-core`; notifies `svc/np-core` on lifecycle events.
@@ -23,3 +23,12 @@ wrangler d1 execute privatetag-db --local --file=svc/media-core/sql/001_init.sql
 ```
 
 R2 buckets are auto-created by Wrangler/Miniflare during `wrangler dev`.
+### Downloading stored media
+
+While running locally you can fetch the raw object from media-core by hitting:
+
+```
+curl http://127.0.0.1:8789/media/<PHOTO_ID>
+```
+
+This routes through the Worker, which looks up the metadata in D1 (`photo_records`) and streams the object from the preview R2 bucket. Authentication/authorization will be layered on once the SentinelTrust IdP is wired in.

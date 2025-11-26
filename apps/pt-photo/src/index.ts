@@ -208,9 +208,11 @@ interface MediaCoreResponse {
   size?: number | null;
   type?: string | null;
   note?: string;
+  download_url?: string;
 }
 
 function renderResultDetails(tagId: string, action: ResolvedAction, media: MediaCoreResponse): string {
+  const downloadUrl = media.download_url;
   return `
     <div class="result">
       <h2>Upload Summary</h2>
@@ -223,6 +225,11 @@ function renderResultDetails(tagId: string, action: ResolvedAction, media: Media
         <dt>Size</dt><dd>${media.size ? `${media.size} bytes` : "n/a"}</dd>
         <dt>Type</dt><dd>${media.type ?? "n/a"}</dd>
       </dl>
+      ${
+        downloadUrl
+          ? `<p><a href="${downloadUrl}" target="_blank" rel="noopener">Preview stored object</a> (local dev only)</p>`
+          : "<p class=\"todo\">TODO: expose download URL when media-core response includes it.</p>"
+      }
       ${media.note ? `<p><em>${media.note}</em></p>` : ""}
     </div>
   `;

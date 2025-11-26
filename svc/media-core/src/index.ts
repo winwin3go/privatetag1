@@ -61,13 +61,40 @@ export default {
 
       console.log(`[media-core] stored object ${objectKey} for TagID=${payload.tagId}`);
 
+      const downloadUrl = buildSelfUrl(url, `/media/${encodeURIComponent(mediaId)}`);
+
       return json({
         photo_id: record.mediaId,
         object_key: record.objectKey,
         filename: record.originalName,
         size: record.size,
         type: record.contentType,
+        download_url: downloadUrl,
         note: payload.file ? "Stored in R2 preview bucket" : "Placeholder upload without binary content"
+      });
+    }
+
+    if (request.method === "GET" && url.pathname.startsWith("/media/")) {
+      const mediaId = decodeURIComponent(url.pathname.replace("/media/", "")).trim();
+      if (!mediaId) {
+        return json({ error: "media_id required" }, { status: 400 });
+      }
+
+      const record = await lookupMedia(env, mediaId);
+      if (!record) {
+        return json({ error: "Media not found" }, { status: 404 });
+      }
+
+      const object = await env.MEDIA_BUCKET.get(record.objectKey);
+      if (!object) {
+        return json({ error: "Object not found in R2" }, { status: 404 });
+      }
+
+      return new Response(object.body, {
+        headers: {
+          "content-type": record.contentType ?? "application/octet-stream",
+          "content-disposition": `inline; filename="${record.originalName ?? mediaId}"`
+        }
       });
     }
 
@@ -111,4 +138,43 @@ async function parseUploadRequest(request: Request): Promise<UploadPayload> {
 
 function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+}
+
+async function lookupMedia(env: Env, mediaId: string): Promise<PhotoRecord | null> {
+  try {
+    const row = await env.DB.prepare<{
+      tag_id: string;
+      media_id: string;
+      object_key: string;
+      original_name?: string | null;
+      content_type?: string | null;
+      size?: number | null;
+      created_at: string;
+    }>(`SELECT * FROM photo_records WHERE media_id = ?1 LIMIT 1`)
+      .bind(mediaId)
+      .first();
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      id: 0,
+      tagId: toTagID(row.tag_id),
+      mediaId: row.media_id,
+      objectKey: row.object_key,
+      originalName: row.original_name ?? null,
+      contentType: row.content_type ?? null,
+      size: row.size ?? null,
+      createdAt: row.created_at
+    };
+  } catch (error) {
+    console.error("[media-core] failed to lookup media record", error);
+    return null;
+  }
+}
+
+function buildSelfUrl(current: URL, path: string): string {
+  const origin = `${current.protocol}//${current.host}`;
+  return new URL(path, origin).toString();
 }
