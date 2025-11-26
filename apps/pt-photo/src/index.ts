@@ -56,7 +56,12 @@ async function handleUpload(request: Request, env: Env): Promise<Response> {
     return html(renderCapturePage(message), { status: 400 });
   }
   const mediaResponse = await callService(env.MEDIA_CORE, env.MEDIA_CORE_ORIGIN, "/upload", mediaRequest);
-  const mediaResult = await mediaResponse.json<Record<string, unknown>>();
+  if (!mediaResponse.ok) {
+    const message = await mediaResponse.text();
+    return html(renderCapturePage(`Media-core upload failed: ${message}`), { status: mediaResponse.status });
+  }
+
+  const mediaResult = (await mediaResponse.json()) as MediaCoreResponse;
 
   console.log(
     `[pt-photo] upload flow TagID=${rawTag} => action=${resolvedAction.actionType}, media=${JSON.stringify(mediaResult)}`
@@ -64,9 +69,7 @@ async function handleUpload(request: Request, env: Env): Promise<Response> {
 
   // TODO: integrate PII-safe logging + audit-core emission once real uploads are wired in.
   const summary = `
-    <p><strong>TagID:</strong> ${rawTag}</p>
-    <p><strong>Action:</strong> ${resolvedAction.actionType}</p>
-    <p><strong>Media:</strong> ${JSON.stringify(mediaResult)}</p>
+    ${renderResultDetails(rawTag, resolvedAction, mediaResult)}
     <p class="todo">TODO: persist capture session + binary metadata (D1/R2) and audit trail.</p>
   `;
 
@@ -195,5 +198,32 @@ function renderCapturePage(statusMessage = "", extraContent = ""): string {
       <button type="submit">Upload (stub)</button>
     </form>
     ${extraContent}
+  `;
+}
+
+interface MediaCoreResponse {
+  photo_id: string;
+  object_key: string;
+  filename?: string | null;
+  size?: number | null;
+  type?: string | null;
+  note?: string;
+}
+
+function renderResultDetails(tagId: string, action: ResolvedAction, media: MediaCoreResponse): string {
+  return `
+    <div class="result">
+      <h2>Upload Summary</h2>
+      <dl>
+        <dt>Tag ID</dt><dd>${tagId}</dd>
+        <dt>Action Type</dt><dd>${action.actionType}</dd>
+        <dt>Photo ID</dt><dd>${media.photo_id}</dd>
+        <dt>Object Key</dt><dd><code>${media.object_key}</code></dd>
+        <dt>Filename</dt><dd>${media.filename ?? "n/a"}</dd>
+        <dt>Size</dt><dd>${media.size ? `${media.size} bytes` : "n/a"}</dd>
+        <dt>Type</dt><dd>${media.type ?? "n/a"}</dd>
+      </dl>
+      ${media.note ? `<p><em>${media.note}</em></p>` : ""}
+    </div>
   `;
 }
