@@ -18,7 +18,8 @@ export default {
     }
 
     if (request.method === "GET" && url.pathname === "/") {
-      return html(renderCapturePage());
+      const captures = await fetchRecentCaptures(env, 5);
+      return html(renderCapturePage("", "", captures));
     }
 
     if (request.method === "POST" && url.pathname === "/upload") {
@@ -34,7 +35,8 @@ async function handleUpload(request: Request, env: Env): Promise<Response> {
   const rawTag = input.tagId;
 
   if (!rawTag) {
-    return html(renderCapturePage("Missing tag_id field"), { status: 400 });
+    const captures = await fetchRecentCaptures(env, 5);
+    return html(renderCapturePage("Missing tag_id field", "", captures), { status: 400 });
   }
 
   const tagLookup = await callService(env.TAG_CORE, env.TAG_CORE_ORIGIN, `/tags/${encodeURIComponent(rawTag)}`, {
@@ -43,7 +45,8 @@ async function handleUpload(request: Request, env: Env): Promise<Response> {
 
   if (!tagLookup.ok) {
     const message = await tagLookup.text();
-    return html(renderCapturePage(`Tag lookup failed: ${message}`), { status: tagLookup.status });
+    const captures = await fetchRecentCaptures(env, 5);
+    return html(renderCapturePage(`Tag lookup failed: ${message}`, "", captures), { status: tagLookup.status });
   }
 
   const resolvedAction = (await tagLookup.json()) as ResolvedAction;
@@ -58,7 +61,8 @@ async function handleUpload(request: Request, env: Env): Promise<Response> {
   const mediaResponse = await callService(env.MEDIA_CORE, env.MEDIA_CORE_ORIGIN, "/upload", mediaRequest);
   if (!mediaResponse.ok) {
     const message = await mediaResponse.text();
-    return html(renderCapturePage(`Media-core upload failed: ${message}`), { status: mediaResponse.status });
+    const captures = await fetchRecentCaptures(env, 5);
+    return html(renderCapturePage(`Media-core upload failed: ${message}`, "", captures), { status: mediaResponse.status });
   }
 
   const mediaResult = (await mediaResponse.json()) as MediaCoreResponse;
@@ -73,7 +77,8 @@ async function handleUpload(request: Request, env: Env): Promise<Response> {
     <p class="todo">TODO: persist capture session + binary metadata (D1/R2) and audit trail.</p>
   `;
 
-  return html(renderCapturePage("Stub upload complete.", summary));
+  const captures = await fetchRecentCaptures(env, 5);
+  return html(renderCapturePage("Stub upload complete.", summary, captures));
 }
 
 async function callService(
@@ -181,7 +186,11 @@ const json = (data: unknown, init: ResponseInit = {}): Response =>
     ...init
   });
 
-function renderCapturePage(statusMessage = "", extraContent = ""): string {
+function renderCapturePage(
+  statusMessage = "",
+  extraContent = "",
+  captures: MediaRecordSummary[] = []
+): string {
   return `
     <h1>PrivateTag1 Photo Capture MVP</h1>
     <p>This stub demonstrates the control-plane (tag-core) → data-plane (media-core) flow.</p>
@@ -198,6 +207,7 @@ function renderCapturePage(statusMessage = "", extraContent = ""): string {
       <button type="submit">Upload (stub)</button>
     </form>
     ${extraContent}
+    ${renderCaptureList(captures)}
   `;
 }
 
@@ -209,6 +219,13 @@ interface MediaCoreResponse {
   type?: string | null;
   note?: string;
   download_url?: string;
+}
+
+interface MediaRecordSummary {
+  media_id: string;
+  tag_id: string;
+  filename?: string | null;
+  created_at: string;
 }
 
 function renderResultDetails(tagId: string, action: ResolvedAction, media: MediaCoreResponse): string {
@@ -233,4 +250,53 @@ function renderResultDetails(tagId: string, action: ResolvedAction, media: Media
       ${media.note ? `<p><em>${media.note}</em></p>` : ""}
     </div>
   `;
+}
+
+function renderCaptureList(captures: MediaRecordSummary[]): string {
+  if (!captures.length) {
+    return `<section><h2>Recent captures</h2><p>No records yet. Upload a photo to populate this list.</p></section>`;
+  }
+
+  const rows = captures
+    .map(
+      (entry) => `
+        <tr>
+          <td>${entry.created_at}</td>
+          <td>${entry.tag_id}</td>
+          <td><code>${entry.media_id}</code></td>
+          <td>${entry.filename ?? "n/a"}</td>
+        </tr>
+      `
+    )
+    .join("");
+
+  return `
+    <section>
+      <h2>Recent captures</h2>
+      <table>
+        <thead>
+          <tr><th>Created</th><th>Tag ID</th><th>Media ID</th><th>Filename</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </section>
+  `;
+}
+
+async function fetchRecentCaptures(env: Env, limit: number): Promise<MediaRecordSummary[]> {
+  try {
+    const response = await callService(
+      env.MEDIA_CORE,
+      env.MEDIA_CORE_ORIGIN,
+      `/media?limit=${encodeURIComponent(String(limit))}`
+    );
+    if (!response.ok) {
+      console.warn("[pt-photo] unable to load capture history", await response.text());
+      return [];
+    }
+    return (await response.json()) as MediaRecordSummary[];
+  } catch (error) {
+    console.warn("[pt-photo] capture history fetch error", error);
+    return [];
+  }
 }

@@ -29,3 +29,4 @@ Skeleton only; implementation will be added later.
    - `pnpm dev:pt-photo`
 4. Navigate to http://127.0.0.1:8787, enter TagID `TESTPHOTO1`, pick an image, and upload. Wrangler logs will show the tag-core lookup, media-core R2 write, and D1 insert. The confirmation panel displays the metadata returned by media-core.
 5. Use the “Preview stored object” link in the success panel (or curl the media-core endpoint) to download the file streamed back from the R2 preview bucket via `svc/media-core`.
+6. Scroll down to view the “Recent captures” table. It calls `svc/media-core`’s listing endpoint to show the latest entries from the shared D1 table, ensuring the UI stays in sync even when other apps create captures.

@@ -79,6 +79,12 @@ export default {
       });
     }
 
+    if (request.method === "GET" && url.pathname === "/media") {
+      const limit = Math.min(Number(url.searchParams.get("limit") ?? "10"), 50);
+      const records = await listRecentMedia(env, isNaN(limit) || limit <= 0 ? 10 : limit);
+      return json(records);
+    }
+
     if (request.method === "GET" && url.pathname.startsWith("/media/")) {
       const mediaId = decodeURIComponent(url.pathname.replace("/media/", "")).trim();
       if (!mediaId) {
@@ -209,5 +215,42 @@ async function validateTag(env: Env, tagId: string): Promise<boolean> {
   } catch (error) {
     console.error("[media-core] failed to validate TagID", error);
     return false;
+  }
+}
+
+async function listRecentMedia(env: Env, limit: number): Promise<
+  Array<{
+    media_id: string;
+    tag_id: string;
+    filename?: string | null;
+    created_at: string;
+  }>
+> {
+  try {
+    const results = await env.DB.prepare<{
+      media_id: string;
+      tag_id: string;
+      original_name?: string | null;
+      created_at: string;
+    }>(
+      `
+        SELECT media_id, tag_id, original_name, created_at
+        FROM photo_records
+        ORDER BY created_at DESC
+        LIMIT ?1
+      `
+    )
+      .bind(limit)
+      .all();
+
+    return results.results.map((row) => ({
+      media_id: row.media_id,
+      tag_id: row.tag_id,
+      filename: row.original_name ?? null,
+      created_at: row.created_at
+    }));
+  } catch (error) {
+    console.error("[media-core] failed to list media records", error);
+    return [];
   }
 }

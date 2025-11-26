@@ -46,3 +46,26 @@ curl -X DELETE http://127.0.0.1:8789/media/<PHOTO_ID>
 ```
 
 This removes the row from `photo_records` and deletes the blob from the preview R2 bucket. In production, deletion will also trigger audit-core + notification events.
+
+### Listing recent captures
+
+For debugging or admin tooling, media-core exposes a lightweight listing endpoint:
+
+```
+curl "http://127.0.0.1:8789/media?limit=5"
+```
+
+Response example:
+
+```json
+[
+  {
+    "media_id": "media-123",
+    "tag_id": "TESTPHOTO1",
+    "filename": "sample.jpg",
+    "created_at": "2025-11-25T20:10:11.000Z"
+  }
+]
+```
+
+Use this endpoint sparingly; full-text search + pagination will come via dedicated admin Workers later.
