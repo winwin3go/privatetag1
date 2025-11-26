@@ -20,4 +20,8 @@ and storage primitives that all applications can reuse.
    - `pnpm dev:media-core` → media data-plane abstraction at http://127.0.0.1:8789
    - `pnpm dev:pt-photo` → photo capture MVP at http://127.0.0.1:8787
 3. Wrangler creates isolated preview D1 databases (`DB` binding) and R2 buckets (`MEDIA_BUCKET`) per Worker; production IDs are configured later via Cloudflare dashboards/Terraform.
-4. The pt-photo Worker calls tag-core and media-core via service bindings (or the documented local fallbacks) so you can exercise the entire flow using the stub UI at `/`.
+4. Seed the shared D1 database with demo TagIDs when running locally:
+   ```
+   wrangler d1 execute privatetag-db --local --file=svc/tag-core/sql/001_init.sql
+   ```
+5. The pt-photo Worker calls tag-core and media-core via service bindings (or the documented local fallbacks) so you can exercise the entire flow using the stub UI at `/`.

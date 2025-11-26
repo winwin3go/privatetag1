@@ -1,20 +1,15 @@
-import { ActionType, ResolvedAction, TagID, toTagID } from "@privatetag/x402-core";
+import { ActionType, ResolvedAction, toTagID } from "@privatetag/x402-core";
 
 export interface Env {
   DB: D1Database;
 }
 
-const SAMPLE_LOOKUP: Record<string, ResolvedAction> = {
+const FALLBACK: Record<string, ResolvedAction> = {
   TESTPHOTO1: {
     tagId: toTagID("TESTPHOTO1"),
     actionType: ActionType.PHOTO_CAPTURE,
     target: { type: "service", value: "media-core" },
-    note: "Stub action for capture flows"
-  },
-  TESTPHOTO2: {
-    tagId: toTagID("TESTPHOTO2"),
-    actionType: ActionType.PHOTO_VIEW,
-    target: { type: "url", value: "https://example.com/preview" }
+    note: "Fallback action for capture flows"
   }
 };
 
@@ -34,17 +29,71 @@ export default {
 
     if (url.pathname.startsWith("/tags/")) {
       const rawId = decodeURIComponent(url.pathname.replace("/tags/", "")).trim().toUpperCase();
-      console.log(`[tag-core] stub lookup for TagID=${rawId}`);
+      console.log(`[tag-core] resolving TagID=${rawId}`);
 
-      // TODO: Replace SAMPLE_LOOKUP with D1 query (env.DB).
-      const payload = SAMPLE_LOOKUP[rawId];
-      if (!payload) {
-        return json({ error: "TagID not found", tagId: rawId }, { status: 404 });
+      const resolved = await resolveFromDatabase(env, rawId);
+      if (resolved) {
+        return json(resolved);
       }
 
-      return json(payload);
+      const fallback = FALLBACK[rawId];
+      if (fallback) {
+        console.warn(`[tag-core] using fallback action for TagID=${rawId}; seed the D1 database to avoid this.`);
+        return json(fallback);
+      }
+
+      return json({ error: "TagID not found", tagId: rawId }, { status: 404 });
     }
 
     return json({ error: "Not Found", service: "tag-core" }, { status: 404 });
   }
 };
+
+type TagActionRow = {
+  tag_id: string;
+  action_type: string;
+  target_type: "service" | "url";
+  target_value: string;
+  note?: string | null;
+};
+
+async function resolveFromDatabase(env: Env, tagId: string): Promise<ResolvedAction | null> {
+  try {
+    const row = await env.DB.prepare<TagActionRow>(
+      `
+      SELECT tr.tag_id, ta.action_type, ta.target_type, ta.target_value, ta.note
+      FROM tag_records tr
+      JOIN tag_actions ta ON ta.tag_id = tr.tag_id
+      WHERE tr.tag_id = ?
+      LIMIT 1
+    `
+    )
+      .bind(tagId)
+      .first();
+
+    if (!row) {
+      return null;
+    }
+
+    return {
+      tagId: toTagID(row.tag_id),
+      actionType: toActionType(row.action_type),
+      target: {
+        type: row.target_type,
+        value: row.target_value
+      },
+      note: row.note ?? undefined
+    };
+  } catch (error) {
+    console.error("[tag-core] failed to query D1", error);
+    return null;
+  }
+}
+
+function toActionType(value: string): ActionType {
+  if (value in ActionType) {
+    return ActionType[value as keyof typeof ActionType];
+  }
+
+  return ActionType.REDIRECT;
+}
