@@ -2,8 +2,13 @@
 
 Notification Plane worker(s) skeleton.
 
-- Responsibility 1: Dispatch multi-channel notifications for the platform.
-- Responsibility 2: Coordinate triggers from `svc/tag-core` and `svc/media-core`.
-- Responsibility 3: Provide hooks for future NP scaling and telemetry.
+## Contract
+
+- **Endpoints**:
+  - `POST /notify` → accepts `{ channel, template, payload, recipients[] }`.
+  - `POST /webhook/{source}` → receives events from services (tag-core, media-core) to fan out.
+- **Channels**: Email, SMS, push/webhook — initially mocked via logging but contract stable.
+- **Dependencies**: Uses Durable Object or Queue for fan-out reliability. Persists notification attempts via `pkg/x402-db` schema.
+- **Consumers**: Triggered by `apps/pt-photo`, `apps/pt-saas`, `svc/tag-core`, `svc/media-core`, etc.
 
 Skeleton only; implementation will be added later.

@@ -2,8 +2,14 @@
 
 SentinelTrust IdP gateway skeleton for auth and SSO.
 
-- Responsibility 1: Handle authentication flows for PrivateTag and StrongHold.
-- Responsibility 2: Coordinate with shared identity models in `pkg/x402-core`.
-- Responsibility 3: Expose hooks for tenant mapping and policies.
+## Contract
+
+- **Endpoints**:
+  - `POST /login` → exchanges credentials/OIDC tokens for session cookies or JWTs.
+  - `POST /token/introspect` → verifies tokens for other Workers.
+  - `GET /userinfo` → returns `{ tenantId, profile, roles[] }`.
+- **Bindings**: D1 for tenant + identity records, KV for session caching.
+- **Dependencies**: Emits events to `svc/audit-core`; optionally uses `svc/np-core` for MFA notifications.
+- **Consumers**: All apps/services rely on its JWTs/bearer tokens; contract defined via `pkg/x402-core` auth types.
 
 Skeleton only; implementation will be added later.

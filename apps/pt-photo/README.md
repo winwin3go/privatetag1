@@ -2,8 +2,15 @@
 
 First-stage PrivateTag Photo Capture application skeleton.
 
-- Responsibility 1: Capture and upload photo data via Workers.
-- Responsibility 2: Store metadata in shared `pkg/` domain models.
-- Responsibility 3: Use Cloudflare R2/KV bindings once configured.
+## Contract
+
+- **HTTP Surface**: `/capture` HTML/JS UI plus `/api/upload` Worker endpoint receiving multipart uploads.
+- **Call Flow**:
+  - Validate TagID + tenant context through `svc/tag-core`.
+  - Stream binary payloads to `svc/media-core` to obtain `mediaId`.
+  - Persist capture metadata using types from `pkg/pt-domain`.
+  - Trigger notifications via `svc/np-core` after a successful upload.
+- **Responses**: Return JSON `{ mediaId, tagId, status }` for API calls and success/error pages for UI.
+- **Auth**: Requires session tokens issued by `svc/st-idp` (bearer or cookie).
 
 Skeleton only; implementation will be added later.
