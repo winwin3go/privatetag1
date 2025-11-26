@@ -27,6 +27,44 @@ export default {
       return json({ status: "ok", service: "tag-core" });
     }
 
+    if (request.method === "POST" && url.pathname === "/tags") {
+      const payload = await parseTagCreateRequest(request);
+      if (!payload.ok) {
+        return json({ error: payload.error }, { status: 400 });
+      }
+
+      try {
+        await env.DB.prepare(
+          `
+            INSERT OR IGNORE INTO tag_records (tag_id, tenant_id, status)
+            VALUES (?1, ?2, 'active')
+          `
+        )
+          .bind(payload.tagId, payload.tenantId)
+          .run();
+
+        await env.DB.prepare(
+          `
+            INSERT INTO tag_actions (tag_id, action_type, target_type, target_value, note)
+            VALUES (?1, ?2, ?3, ?4, ?5)
+          `
+        )
+          .bind(payload.tagId, payload.actionType, payload.target.type, payload.target.value, payload.note ?? null)
+          .run();
+      } catch (error) {
+        console.error("[tag-core] failed to create tag", error);
+        return json({ error: "Failed to create tag" }, { status: 500 });
+      }
+
+      return json({
+        status: "created",
+        tag_id: payload.tagId,
+        tenant_id: payload.tenantId,
+        action_type: payload.actionType,
+        target: payload.target
+      });
+    }
+
     if (url.pathname.startsWith("/tags/")) {
       const rawId = decodeURIComponent(url.pathname.replace("/tags/", "")).trim().toUpperCase();
       console.log(`[tag-core] resolving TagID=${rawId}`);
@@ -96,4 +134,45 @@ function toActionType(value: string): ActionType {
   }
 
   return ActionType.REDIRECT;
+}
+
+type TagCreateParseResult =
+  | {
+      ok: true;
+      tagId: string;
+      tenantId: string;
+      actionType: string;
+      target: { type: "service" | "url"; value: string };
+      note?: string;
+    }
+  | { ok: false; error: string };
+
+async function parseTagCreateRequest(request: Request): Promise<TagCreateParseResult> {
+  try {
+    const body = await request.json<Record<string, unknown>>();
+    const tagId = (body.tag_id ?? "").toString().trim().toUpperCase();
+    const tenantId = (body.tenant_id ?? "").toString().trim();
+    const actionType = (body.action_type ?? "").toString().trim().toUpperCase();
+    const targetType = (body.target_type ?? "").toString().trim().toLowerCase();
+    const targetValue = (body.target_value ?? "").toString().trim();
+
+    if (!tagId || !tenantId || !actionType || !targetType || !targetValue) {
+      return { ok: false, error: "tag_id, tenant_id, action_type, target_type, target_value are required" };
+    }
+    if (targetType !== "service" && targetType !== "url") {
+      return { ok: false, error: "target_type must be 'service' or 'url'" };
+    }
+
+    return {
+      ok: true,
+      tagId,
+      tenantId,
+      actionType,
+      target: { type: targetType, value: targetValue },
+      note: body.note ? body.note.toString() : undefined
+    };
+  } catch (error) {
+    console.warn("[tag-core] failed to parse create request", error);
+    return { ok: false, error: "Invalid JSON body" };
+  }
 }
