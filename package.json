@@ -3,7 +3,11 @@
   "private": true,
   "scripts": {
     "build": "echo \"Implement build per app/service later\"",
-    "lint": "echo \"Linting to be added\""
+    "lint": "echo \"Linting to be added\"",
+    "dev:pt-photo": "cd apps/pt-photo && wrangler dev",
+    "dev:tag-core": "cd svc/tag-core && wrangler dev",
+    "dev:media-core": "cd svc/media-core && wrangler dev",
+    "dev:all": "echo \"Run pnpm dev:tag-core, pnpm dev:media-core, pnpm dev:pt-photo in separate terminals\""
   },
   "devDependencies": {
     "eslint": "*",

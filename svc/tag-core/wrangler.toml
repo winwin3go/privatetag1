@@ -1,5 +1,16 @@
 name = "tag-core"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
+# Control-plane Worker that owns TagID + action configuration.
 
-# TODO: add D1, R2, KV, and other bindings as needed
+[dev]
+port = 8788
+
+[[d1_databases]]
+binding = "DB"
+database_name = "privatetag-db"
+database_id = "privatetag-db-local"
+# Central registry (D1) for Tag metadata and action definitions.
+
+[vars]
+SAMPLE_DATASET = "local"

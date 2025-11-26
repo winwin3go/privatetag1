@@ -1,5 +1,39 @@
 name = "pt-photo"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
+# Data-plane Worker serving the smartphone-first capture experience.
 
-# TODO: add D1, R2, KV, and other bindings as needed
+[dev]
+port = 8787
+
+[[d1_databases]]
+binding = "DB"
+database_name = "privatetag-db"
+database_id = "privatetag-db-local"
+# Shared control-plane data accessed read-only from the app.
+
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "privatetag-media"
+preview_bucket_name = "privatetag-media-preview"
+# Bucket reference for future direct reads (uploads delegated to media-core).
+
+[[services]]
+binding = "TAG_CORE"
+service = "tag-core"
+environment = "production"
+# Service binding to the control-plane tag-core Worker.
+
+[[services]]
+binding = "MEDIA_CORE"
+service = "media-core"
+environment = "production"
+# Service binding to the shared media-core Worker for uploads.
+
+[vars]
+TAG_CORE_ORIGIN = "https://svc-tag-core.example"
+MEDIA_CORE_ORIGIN = "https://svc-media-core.example"
+
+[env.dev.vars]
+TAG_CORE_ORIGIN = "http://127.0.0.1:8788"
+MEDIA_CORE_ORIGIN = "http://127.0.0.1:8789"

@@ -6,6 +6,13 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@privatetag/x402-core": ["pkg/x402-core/src"],
+      "@privatetag/x402-db": ["pkg/x402-db/src"],
+      "@privatetag/pt-domain": ["pkg/pt-domain/src"],
+      "@privatetag/sh-domain": ["pkg/sh-domain/src"]
+    }
   }
 }
