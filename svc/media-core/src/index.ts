@@ -22,30 +22,52 @@ export default {
 
     if (request.method === "POST" && url.pathname === "/upload") {
       const payload = await parseUploadRequest(request);
-      const tagId = toTagID(payload.tagId ?? "UNKNOWN");
+      if (!payload.tagId) {
+        return json({ error: "tag_id required" }, { status: 400 });
+      }
 
-      console.log(
-        `[media-core] stub upload TagID=${tagId} filename=${payload.file?.name ?? "N/A"} size=${payload.file?.size ?? 0}`
-      );
+      // TODO: consult tag-core or shared cache to validate tag_id + permissions.
+      const tagId = toTagID(payload.tagId);
+      const mediaId = `media-${Date.now()}`;
+      const objectKey = `dev/${tagId}/${Date.now()}-${sanitizeFilename(payload.file?.name ?? "placeholder.bin")}`;
 
-      // TODO: Persist metadata to env.DB and stream bytes to env.MEDIA_BUCKET.
-      const photo: PhotoRecord = {
-        id: Date.now(),
+      if (payload.file) {
+        await env.MEDIA_BUCKET.put(objectKey, payload.file.stream(), {
+          httpMetadata: {
+            contentType: payload.file.type || "application/octet-stream"
+          }
+        });
+      }
+
+      await env.DB.prepare(
+        `
+          INSERT INTO photo_records (tag_id, media_id, object_key, original_name, content_type, size)
+          VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+        `
+      )
+        .bind(payload.tagId, mediaId, objectKey, payload.file?.name ?? null, payload.file?.type ?? null, payload.file?.size ?? null)
+        .run();
+
+      const record: PhotoRecord = {
+        id: 0,
         tagId,
-        mediaId: `media-${Date.now()}`,
-        objectKey: `dev/${tagId}/${Date.now()}-${payload.file?.name ?? "placeholder"}`,
+        mediaId,
+        objectKey,
+        originalName: payload.file?.name ?? null,
+        contentType: payload.file?.type ?? null,
+        size: payload.file?.size ?? null,
         createdAt: new Date().toISOString()
       };
 
+      console.log(`[media-core] stored object ${objectKey} for TagID=${payload.tagId}`);
+
       return json({
-        photo_id: photo.mediaId,
-        object_key: photo.objectKey,
-        filename: payload.file?.name ?? null,
-        size: payload.file?.size ?? null,
-        type: payload.file?.type ?? null,
-        note: payload.file
-          ? "Stubbed upload - binary not yet written to R2."
-          : "Stubbed upload - placeholder body used (no binary)."
+        photo_id: record.mediaId,
+        object_key: record.objectKey,
+        filename: record.originalName,
+        size: record.size,
+        type: record.contentType,
+        note: payload.file ? "Stored in R2 preview bucket" : "Placeholder upload without binary content"
       });
     }
 
@@ -85,4 +107,8 @@ async function parseUploadRequest(request: Request): Promise<UploadPayload> {
   }
 
   return { tagId: "" };
+}
+
+function sanitizeFilename(name: string): string {
+  return name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
 }

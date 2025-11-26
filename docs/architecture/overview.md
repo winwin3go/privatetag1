@@ -24,4 +24,8 @@ and storage primitives that all applications can reuse.
    ```
    wrangler d1 execute privatetag-db --local --file=svc/tag-core/sql/001_init.sql
    ```
-5. The pt-photo Worker calls tag-core and media-core via service bindings (or the documented local fallbacks) so you can exercise the entire flow using the stub UI at `/`.
+5. (Optional) Initialize the media metadata table:
+   ```
+   wrangler d1 execute privatetag-db --local --file=svc/media-core/sql/001_init.sql
+   ```
+6. The pt-photo Worker calls tag-core and media-core via service bindings (or the documented local fallbacks) so you can exercise the entire flow using the stub UI at `/`.

@@ -31,5 +31,8 @@ export interface PhotoRecord {
   tagId: TagID;
   mediaId: string;
   objectKey: string;
+  originalName?: string | null;
+  contentType?: string | null;
+  size?: number | null;
   createdAt: string;
 }

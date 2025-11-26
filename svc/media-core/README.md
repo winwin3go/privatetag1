@@ -13,3 +13,13 @@ Media upload and serve abstraction for R2 skeleton.
 - **Clients**: `apps/pt-photo`, `apps/pt-saas`, `apps/sh-home`, and others needing binary storage.
 
 Skeleton only; implementation will be added later.
+
+### Local Dev Setup
+
+Seed the D1 table used for media metadata before exercising uploads:
+
+```
+wrangler d1 execute privatetag-db --local --file=svc/media-core/sql/001_init.sql
+```
+
+R2 buckets are auto-created by Wrangler/Miniflare during `wrangler dev`.
