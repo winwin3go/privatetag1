@@ -17,3 +17,46 @@ binding = "MEDIA_BUCKET"
 bucket_name = "privatetag-media"
 preview_bucket_name = "privatetag-media-preview"
 # Physical object store for binaries referenced by apps.
+
+[[services]]
+binding = "AUDIT_CORE"
+service = "audit-core"
+environment = "production"
+# Logs PHOTO_STORED / PHOTO_DELETED events for downstream analytics.
+
+[vars]
+AUDIT_CORE_ORIGIN = "https://svc-audit-core.example"
+
+[env.dev]
+name = "media-core-dev"
+account_id = "TODO_ACCOUNT_ID"
+
+[env.dev.vars]
+AUDIT_CORE_ORIGIN = "http://127.0.0.1:8791"
+
+[[env.dev.d1_databases]]
+binding = "DB"
+database_name = "privatetag-db-dev"
+database_id = "TODO_D1_DB_DEV_ID"
+
+[[env.dev.r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "privatetag-media-dev"
+preview_bucket_name = "privatetag-media-dev-preview"
+
+[env.stage]
+name = "media-core-stage"
+account_id = "TODO_ACCOUNT_ID"
+
+[env.stage.vars]
+AUDIT_CORE_ORIGIN = "https://stage-audit-core.example"
+
+[[env.stage.d1_databases]]
+binding = "DB"
+database_name = "privatetag-db-stage"
+database_id = "TODO_D1_DB_STAGE_ID"
+
+[[env.stage.r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "privatetag-media-stage"
+preview_bucket_name = "privatetag-media-stage-preview"

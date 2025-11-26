@@ -30,10 +30,62 @@ service = "media-core"
 environment = "production"
 # Service binding to the shared media-core Worker for uploads.
 
+[[services]]
+binding = "ST_IDP"
+service = "st-idp"
+environment = "production"
+# SentinelTrust IdP stub for fetching AuthContext.
+
+[[services]]
+binding = "AUDIT_CORE"
+service = "audit-core"
+environment = "production"
+# Audit/logging stub for emitting capture events.
+
 [vars]
 TAG_CORE_ORIGIN = "https://svc-tag-core.example"
 MEDIA_CORE_ORIGIN = "https://svc-media-core.example"
+ST_IDP_ORIGIN = "https://svc-st-idp.example"
+AUDIT_CORE_ORIGIN = "https://svc-audit-core.example"
+
+[env.dev]
+name = "pt-photo-dev"
+account_id = "TODO_ACCOUNT_ID"
+# TODO: Set to your Cloudflare account ID before deploying the dev Worker.
 
 [env.dev.vars]
 TAG_CORE_ORIGIN = "http://127.0.0.1:8788"
 MEDIA_CORE_ORIGIN = "http://127.0.0.1:8789"
+ST_IDP_ORIGIN = "http://127.0.0.1:8790"
+AUDIT_CORE_ORIGIN = "http://127.0.0.1:8791"
+
+[[env.dev.d1_databases]]
+binding = "DB"
+database_name = "privatetag-db-dev"
+database_id = "TODO_D1_DB_DEV_ID"
+
+[[env.dev.r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "privatetag-media-dev"
+preview_bucket_name = "privatetag-media-dev-preview"
+
+[env.stage]
+name = "pt-photo-stage"
+account_id = "TODO_ACCOUNT_ID"
+# TODO: Fill in stage Cloudflare account + resource IDs.
+
+[env.stage.vars]
+TAG_CORE_ORIGIN = "https://stage-tag-core.example"
+MEDIA_CORE_ORIGIN = "https://stage-media-core.example"
+ST_IDP_ORIGIN = "https://stage-st-idp.example"
+AUDIT_CORE_ORIGIN = "https://stage-audit-core.example"
+
+[[env.stage.d1_databases]]
+binding = "DB"
+database_name = "privatetag-db-stage"
+database_id = "TODO_D1_DB_STAGE_ID"
+
+[[env.stage.r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "privatetag-media-stage"
+preview_bucket_name = "privatetag-media-stage-preview"

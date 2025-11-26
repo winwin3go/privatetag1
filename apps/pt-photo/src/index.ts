@@ -1,10 +1,20 @@
-import { ResolvedAction } from "@privatetag/x402-core";
+import { AuthContext, ResolvedAction } from "@privatetag/x402-core";
+import {
+  AuditEvent,
+  AuditEventType,
+  MAX_CAPTURE_FILE_SIZE_BYTES,
+  SUPPORTED_IMAGE_TYPES
+} from "@privatetag/pt-domain";
 
 interface Env {
   TAG_CORE?: Fetcher;
   MEDIA_CORE?: Fetcher;
+  ST_IDP?: Fetcher;
+  AUDIT_CORE?: Fetcher;
   TAG_CORE_ORIGIN?: string;
   MEDIA_CORE_ORIGIN?: string;
+  ST_IDP_ORIGIN?: string;
+  AUDIT_CORE_ORIGIN?: string;
   DB: D1Database;
   MEDIA_BUCKET: R2Bucket;
 }
@@ -39,6 +49,21 @@ async function handleUpload(request: Request, env: Env): Promise<Response> {
     return html(renderCapturePage("Missing tag_id field", "", captures), { status: 400 });
   }
 
+  const authContext = await fetchAuthContext(env);
+
+  await sendAuditEvents(env, [
+    {
+      type: AuditEventType.PHOTO_UPLOAD_REQUESTED,
+      timestamp: new Date().toISOString(),
+      tagId: rawTag,
+      auth: authContext,
+      metadata: {
+        source: "pt-photo",
+        filename: input.mode === "form" ? input.file?.name ?? undefined : undefined
+      }
+    }
+  ]);
+
   const tagLookup = await callService(env.TAG_CORE, env.TAG_CORE_ORIGIN, `/tags/${encodeURIComponent(rawTag)}`, {
     method: "GET"
   });
@@ -56,7 +81,8 @@ async function handleUpload(request: Request, env: Env): Promise<Response> {
     mediaRequest = await buildMediaCoreRequest(input);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown upload error";
-    return html(renderCapturePage(message), { status: 400 });
+    const captures = await fetchRecentCaptures(env, 5);
+    return html(renderCapturePage(message, "", captures), { status: 400 });
   }
   const mediaResponse = await callService(env.MEDIA_CORE, env.MEDIA_CORE_ORIGIN, "/upload", mediaRequest);
   if (!mediaResponse.ok) {
@@ -70,6 +96,20 @@ async function handleUpload(request: Request, env: Env): Promise<Response> {
   console.log(
     `[pt-photo] upload flow TagID=${rawTag} => action=${resolvedAction.actionType}, media=${JSON.stringify(mediaResult)}`
   );
+
+  await sendAuditEvents(env, [
+    {
+      type: AuditEventType.PHOTO_UPLOAD_COMPLETED,
+      timestamp: new Date().toISOString(),
+      tagId: rawTag,
+      mediaId: mediaResult.photo_id,
+      auth: authContext,
+      metadata: {
+        source: "pt-photo",
+        object_key: mediaResult.object_key
+      }
+    }
+  ]);
 
   // TODO: integrate PII-safe logging + audit-core emission once real uploads are wired in.
   const summary = `
@@ -97,6 +137,19 @@ async function callService(
   }
 
   throw new Error(`No binding or fallback origin configured for service path ${path}`);
+}
+
+async function callOptionalService(
+  binding: Fetcher | undefined,
+  fallbackOrigin: string | undefined,
+  path: string,
+  init?: RequestInit
+): Promise<Response | null> {
+  if (!binding && !fallbackOrigin) {
+    return null;
+  }
+
+  return callService(binding, fallbackOrigin, path, init);
 }
 
 type UploadInput =
@@ -135,13 +188,11 @@ async function parseUploadRequest(request: Request): Promise<UploadInput> {
 
 async function buildMediaCoreRequest(input: UploadInput): Promise<RequestInit> {
   if (input.mode === "form") {
-    if (!input.file) {
-      throw new Error("File required for form submission");
-    }
+    const file = ensureValidFile(input.file);
 
     const formData = new FormData();
     formData.append("tag_id", input.tagId);
-    formData.append("photo", input.file);
+    formData.append("photo", file);
     return { method: "POST", body: formData };
   }
 
@@ -167,11 +218,49 @@ const html = (body: string, init: ResponseInit = {}): Response =>
           label { display: block; margin-bottom: 0.5rem; }
           input[type="text"], input[type="file"] { width: 100%; margin-bottom: 1rem; }
           .status { padding: 0.5rem; background: #eef; border-radius: 4px; margin-bottom: 1rem; }
+          .status.error { background: #fee; color: #600; border: 1px solid #c55; }
           .todo { color: #a40; }
+          table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+          th, td { border: 1px solid #ddd; padding: 0.4rem; font-size: 0.9rem; }
+          th { background: #f5f5f5; text-align: left; }
         </style>
       </head>
       <body>
         ${body}
+        <script>
+          (() => {
+            const form = document.getElementById("capture-form");
+            const fileInput = document.getElementById("photo");
+            const errorBox = document.getElementById("client-error");
+            const allowedTypes = ${JSON.stringify(Array.from(SUPPORTED_IMAGE_TYPES))};
+            const maxBytes = ${MAX_CAPTURE_FILE_SIZE_BYTES};
+
+            form?.addEventListener("submit", (event) => {
+              if (!fileInput) return;
+              const file = fileInput.files?.[0];
+              const showError = (msg) => {
+                if (!errorBox) return;
+                errorBox.textContent = msg;
+                errorBox.hidden = false;
+              };
+              errorBox.hidden = true;
+              if (!file) {
+                event.preventDefault();
+                showError("Select an image before uploading.");
+                return;
+              }
+              if (file.size > maxBytes) {
+                event.preventDefault();
+                showError(\`File too large (max \${(maxBytes / 1024 / 1024).toFixed(0)} MB).\`);
+                return;
+              }
+              if (file.type && !allowedTypes.includes(file.type)) {
+                event.preventDefault();
+                showError(\`Unsupported type \${file.type}.\`);
+              }
+            });
+          })();
+        </script>
       </body>
     </html>`,
     {
@@ -195,12 +284,16 @@ function renderCapturePage(
     <h1>PrivateTag1 Photo Capture MVP</h1>
     <p>This stub demonstrates the control-plane (tag-core) → data-plane (media-core) flow.</p>
     ${statusMessage ? `<div class="status">${statusMessage}</div>` : ""}
-    <form action="/upload" method="post" enctype="multipart/form-data">
+    <div id="client-error" class="status error" hidden></div>
+    <form id="capture-form" action="/upload" method="post" enctype="multipart/form-data" novalidate>
       <label for="tag_id">Tag ID</label>
       <input type="text" id="tag_id" name="tag_id" required placeholder="e.g., TESTPHOTO1" />
 
       <label for="photo">Photo</label>
-      <input type="file" id="photo" name="photo" accept="image/*" />
+      <input type="file" id="photo" name="photo" accept="image/*" required />
+      <small>Accepted: ${Array.from(SUPPORTED_IMAGE_TYPES).join(", ")} • Max size: ${Math.round(
+        MAX_CAPTURE_FILE_SIZE_BYTES / (1024 * 1024)
+      )} MB</small>
 
       <p class="todo">TODO: stream directly to media-core + D1 via durable upload/resume logic.</p>
 
@@ -265,6 +358,7 @@ function renderCaptureList(captures: MediaRecordSummary[]): string {
           <td>${entry.tag_id}</td>
           <td><code>${entry.media_id}</code></td>
           <td>${entry.filename ?? "n/a"}</td>
+          <td><a href="/media/${encodeURIComponent(entry.media_id)}" target="_blank" rel="noopener">Open</a></td>
         </tr>
       `
     )
@@ -275,7 +369,7 @@ function renderCaptureList(captures: MediaRecordSummary[]): string {
       <h2>Recent captures</h2>
       <table>
         <thead>
-          <tr><th>Created</th><th>Tag ID</th><th>Media ID</th><th>Filename</th></tr>
+          <tr><th>Created</th><th>Tag ID</th><th>Media ID</th><th>Filename</th><th>Preview</th></tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
@@ -298,5 +392,63 @@ async function fetchRecentCaptures(env: Env, limit: number): Promise<MediaRecord
   } catch (error) {
     console.warn("[pt-photo] capture history fetch error", error);
     return [];
+  }
+}
+
+function ensureValidFile(file: File | null): File {
+  if (!file) {
+    throw new Error("Photo file is required.");
+  }
+
+  if (file.size > MAX_CAPTURE_FILE_SIZE_BYTES) {
+    throw new Error(
+      `File too large. Limit is ${Math.round(MAX_CAPTURE_FILE_SIZE_BYTES / (1024 * 1024))} MB (received ${(
+        file.size /
+        (1024 * 1024)
+      ).toFixed(2)} MB).`
+    );
+  }
+
+  if (file.type && !SUPPORTED_IMAGE_TYPES.has(file.type)) {
+    throw new Error(`Unsupported file type "${file.type}". Allowed: ${Array.from(SUPPORTED_IMAGE_TYPES).join(", ")}`);
+  }
+
+  return file;
+}
+
+async function fetchAuthContext(env: Env): Promise<AuthContext | null> {
+  try {
+    const response = await callOptionalService(env.ST_IDP, env.ST_IDP_ORIGIN, "/whoami");
+    if (!response || !response.ok) {
+      return null;
+    }
+    return (await response.json()) as AuthContext;
+  } catch (error) {
+    console.warn("[pt-photo] unable to fetch auth context", error);
+    return null;
+  }
+}
+
+async function sendAuditEvents(env: Env, events: AuditEvent[]): Promise<void> {
+  if (!events.length) {
+    return;
+  }
+
+  try {
+    const response = await callOptionalService(env.AUDIT_CORE, env.AUDIT_CORE_ORIGIN, "/events", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(events)
+    });
+
+    if (!response) {
+      return;
+    }
+
+    if (!response.ok) {
+      console.warn("[pt-photo] audit-core returned non-200", response.status);
+    }
+  } catch (error) {
+    console.warn("[pt-photo] failed to send audit event", error);
   }
 }

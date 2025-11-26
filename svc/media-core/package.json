@@ -1,0 +1,8 @@
+{
+  "name": "@privatetag/media-core-svc",
+  "private": true,
+  "scripts": {
+    "migrate:local": "wrangler d1 execute privatetag-db --local --config wrangler.toml --file=sql/001_init.sql",
+    "seed:local": "pnpm run migrate:local && wrangler d1 execute privatetag-db --local --config wrangler.toml --file=sql/100_seed.sql"
+  }
+}

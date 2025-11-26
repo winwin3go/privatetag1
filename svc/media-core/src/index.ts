@@ -1,9 +1,12 @@
 import { toTagID } from "@privatetag/x402-core";
 import { PhotoRecord } from "@privatetag/x402-db";
+import { AuditEvent, AuditEventType } from "@privatetag/pt-domain";
 
 interface Env {
   DB: D1Database;
   MEDIA_BUCKET: R2Bucket;
+  AUDIT_CORE?: Fetcher;
+  AUDIT_CORE_ORIGIN?: string;
 }
 
 const json = (data: unknown, init: ResponseInit = {}): Response =>
@@ -68,6 +71,14 @@ export default {
 
       const downloadUrl = buildSelfUrl(url, `/media/${encodeURIComponent(mediaId)}`);
 
+      await emitAuditEvent(env, {
+        type: AuditEventType.PHOTO_STORED,
+        timestamp: new Date().toISOString(),
+        tagId: payload.tagId,
+        mediaId,
+        metadata: { objectKey }
+      });
+
       return json({
         photo_id: record.mediaId,
         object_key: record.objectKey,
@@ -124,6 +135,13 @@ export default {
       await env.DB.prepare(`DELETE FROM photo_records WHERE media_id = ?1`).bind(mediaId).run();
 
       console.log(`[media-core] deleted media_id=${mediaId}`);
+      await emitAuditEvent(env, {
+        type: AuditEventType.PHOTO_DELETED,
+        timestamp: new Date().toISOString(),
+        tagId: record.tagId,
+        mediaId: record.mediaId,
+        metadata: { objectKey: record.objectKey }
+      });
       return json({ status: "deleted", media_id: mediaId });
     }
 
@@ -252,5 +270,39 @@ async function listRecentMedia(env: Env, limit: number): Promise<
   } catch (error) {
     console.error("[media-core] failed to list media records", error);
     return [];
+  }
+}
+
+async function emitAuditEvent(env: Env, event: AuditEvent): Promise<void> {
+  try {
+    if (env.AUDIT_CORE || env.AUDIT_CORE_ORIGIN) {
+      await callAudit(env, [event]);
+    }
+  } catch (error) {
+    console.warn("[media-core] failed to emit audit event", event.type, error);
+  }
+}
+
+async function callAudit(env: Env, events: AuditEvent[]): Promise<void> {
+  const fetcher = env.AUDIT_CORE;
+  const fallback = env.AUDIT_CORE_ORIGIN;
+  if (!fetcher && !fallback) {
+    return;
+  }
+
+  const response = await (fetcher
+    ? fetcher.fetch("https://cf-internal/events", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(events)
+      })
+    : fetch(new URL("/events", fallback!).toString(), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(events)
+      }));
+
+  if (!response.ok) {
+    console.warn("[media-core] audit-core returned non-200", response.status);
   }
 }

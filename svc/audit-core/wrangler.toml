@@ -2,4 +2,15 @@ name = "audit-core"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
 
+[dev]
+port = 8791
+
 # TODO: add D1, R2, KV, and other bindings as needed
+
+[env.dev]
+name = "audit-core-dev"
+account_id = "TODO_ACCOUNT_ID"
+
+[env.stage]
+name = "audit-core-stage"
+account_id = "TODO_ACCOUNT_ID"

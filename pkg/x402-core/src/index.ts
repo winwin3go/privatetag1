@@ -40,3 +40,12 @@ export interface ResolvedAction {
    */
   note?: string;
 }
+
+export interface AuthContext {
+  userId?: string;
+  sessionId?: string;
+  deviceId?: string;
+  roles?: string[];
+  issuedAt?: string;
+  expiresAt?: string;
+}

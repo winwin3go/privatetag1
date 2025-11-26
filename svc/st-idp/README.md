@@ -13,3 +13,8 @@ SentinelTrust IdP gateway skeleton for auth and SSO.
 - **Consumers**: All apps/services rely on its JWTs/bearer tokens; contract defined via `pkg/x402-core` auth types.
 
 Skeleton only; implementation will be added later.
+
+## Local stub endpoints
+
+- `GET /health` – readiness probe.
+- `GET /whoami` – returns a fake `AuthContext` (user/session IDs) used by pt-photo and other Workers while true SentinelTrust functionality is under construction.

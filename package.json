@@ -7,12 +7,21 @@
     "dev:pt-photo": "cd apps/pt-photo && wrangler dev",
     "dev:tag-core": "cd svc/tag-core && wrangler dev",
     "dev:media-core": "cd svc/media-core && wrangler dev",
-    "dev:all": "echo \"Run pnpm dev:tag-core, pnpm dev:media-core, pnpm dev:pt-photo in separate terminals\""
+    "dev:st-idp": "cd svc/st-idp && wrangler dev",
+    "dev:audit-core": "cd svc/audit-core && wrangler dev",
+    "dev:all": "echo \"Run pnpm dev:tag-core, pnpm dev:media-core, pnpm dev:pt-photo in separate terminals\"",
+    "migrate:tag-core": "pnpm --filter svc/tag-core run migrate:local",
+    "seed:tag-core": "pnpm --filter svc/tag-core run seed:local",
+    "migrate:media-core": "pnpm --filter svc/media-core run migrate:local",
+    "seed:media-core": "pnpm --filter svc/media-core run seed:local",
+    "test": "vitest run"
   },
   "devDependencies": {
     "eslint": "*",
     "prettier": "*",
-    "typescript": "*"
+    "typescript": "*",
+    "miniflare": "^3.20241106.0",
+    "vitest": "^2.1.4"
   },
   "dependencies": {}
 }

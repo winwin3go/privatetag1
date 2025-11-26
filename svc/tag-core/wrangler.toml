@@ -14,3 +14,21 @@ database_id = "privatetag-db-local"
 
 [vars]
 SAMPLE_DATASET = "local"
+
+[env.dev]
+name = "tag-core-dev"
+account_id = "TODO_ACCOUNT_ID"
+
+[[env.dev.d1_databases]]
+binding = "DB"
+database_name = "privatetag-db-dev"
+database_id = "TODO_D1_DB_DEV_ID"
+
+[env.stage]
+name = "tag-core-stage"
+account_id = "TODO_ACCOUNT_ID"
+
+[[env.stage.d1_databases]]
+binding = "DB"
+database_name = "privatetag-db-stage"
+database_id = "TODO_D1_DB_STAGE_ID"
