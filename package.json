@@ -1,0 +1,14 @@
+{
+  "name": "privatetag1",
+  "private": true,
+  "scripts": {
+    "build": "echo \"Implement build per app/service later\"",
+    "lint": "echo \"Linting to be added\""
+  },
+  "devDependencies": {
+    "eslint": "*",
+    "prettier": "*",
+    "typescript": "*"
+  },
+  "dependencies": {}
+}

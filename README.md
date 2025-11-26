@@ -1,8 +1,20 @@
 # privatetag1
 
-First development version minimal support for PrivateTag full SaaS services, 2025-11-20  
-Second effort on the 24th to make progress with Codex support
+Combined PrivateTag / StrongHold / x402 monorepo.
 
-## Cloudflare Platform Entry Point
+## Key folders
 
-All Cloudflare-related work (Workers, KV/R2/D1 data layers, GitHub → Cloudflare wiring) lives in `docs/cloudflare.md`, with an actionable provisioning prompt in `docs/cloudflare_prompt.md`. Start there before creating any new Worker or integration so the repo aligns with the org-level cf-foundation and template repos.
+- `apps/` – product-facing Workers for PrivateTag, StrongHold, and shared portals.
+- `svc/` – shared backend services powering tags, media, identity, notifications, and audit.
+- `pkg/` – shared TypeScript packages with domain models, core utilities, and schemas.
+- `infra/` – infrastructure configuration snippets for Cloudflare, Wrangler, Docker, etc.
+- `docs/` – product requirements, architecture overviews, and ops runbooks.
+
+```
+privatetag1/
+├── apps/
+├── svc/
+├── pkg/
+├── infra/
+└── docs/
+```

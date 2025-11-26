@@ -1,0 +1,3 @@
+# Shared Wrangler base configuration placeholder
+
+# Add shared bindings, vars, and workflows here before extending in service wrangler files.
