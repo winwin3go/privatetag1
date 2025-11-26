@@ -103,6 +103,24 @@ export default {
       });
     }
 
+    if (request.method === "DELETE" && url.pathname.startsWith("/media/")) {
+      const mediaId = decodeURIComponent(url.pathname.replace("/media/", "")).trim();
+      if (!mediaId) {
+        return json({ error: "media_id required" }, { status: 400 });
+      }
+
+      const record = await lookupMedia(env, mediaId);
+      if (!record) {
+        return json({ error: "Media not found" }, { status: 404 });
+      }
+
+      await env.MEDIA_BUCKET.delete(record.objectKey);
+      await env.DB.prepare(`DELETE FROM photo_records WHERE media_id = ?1`).bind(mediaId).run();
+
+      console.log(`[media-core] deleted media_id=${mediaId}`);
+      return json({ status: "deleted", media_id: mediaId });
+    }
+
     return json({ error: "Not Found", service: "media-core" }, { status: 404 });
   }
 };

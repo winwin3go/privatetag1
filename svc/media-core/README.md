@@ -36,3 +36,13 @@ This routes through the Worker, which looks up the metadata in D1 (`photo_record
 ### Tag validation
 
 Uploads are rejected if the TagID does not exist in `tag_records`. Seed data (via `svc/tag-core/sql/001_init.sql`) must be applied before exercising media-core locally; otherwise you will receive a 404 error with `{"error":"Unknown TagID"}`.
+
+### Deleting objects
+
+During local development you can delete a stored object to re-run flows:
+
+```
+curl -X DELETE http://127.0.0.1:8789/media/<PHOTO_ID>
+```
+
+This removes the row from `photo_records` and deletes the blob from the preview R2 bucket. In production, deletion will also trigger audit-core + notification events.
