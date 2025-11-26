@@ -32,3 +32,7 @@ curl http://127.0.0.1:8789/media/<PHOTO_ID>
 ```
 
 This routes through the Worker, which looks up the metadata in D1 (`photo_records`) and streams the object from the preview R2 bucket. Authentication/authorization will be layered on once the SentinelTrust IdP is wired in.
+
+### Tag validation
+
+Uploads are rejected if the TagID does not exist in `tag_records`. Seed data (via `svc/tag-core/sql/001_init.sql`) must be applied before exercising media-core locally; otherwise you will receive a 404 error with `{"error":"Unknown TagID"}`.

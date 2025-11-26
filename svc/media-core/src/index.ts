@@ -26,7 +26,12 @@ export default {
         return json({ error: "tag_id required" }, { status: 400 });
       }
 
-      // TODO: consult tag-core or shared cache to validate tag_id + permissions.
+      // Validate the TagID exists in the shared registry.
+      const tagValid = await validateTag(env, payload.tagId);
+      if (!tagValid) {
+        return json({ error: "Unknown TagID", tag_id: payload.tagId }, { status: 404 });
+      }
+
       const tagId = toTagID(payload.tagId);
       const mediaId = `media-${Date.now()}`;
       const objectKey = `dev/${tagId}/${Date.now()}-${sanitizeFilename(payload.file?.name ?? "placeholder.bin")}`;
@@ -177,4 +182,14 @@ async function lookupMedia(env: Env, mediaId: string): Promise<PhotoRecord | nul
 function buildSelfUrl(current: URL, path: string): string {
   const origin = `${current.protocol}//${current.host}`;
   return new URL(path, origin).toString();
+}
+
+async function validateTag(env: Env, tagId: string): Promise<boolean> {
+  try {
+    const row = await env.DB.prepare(`SELECT 1 FROM tag_records WHERE tag_id = ?1 LIMIT 1`).bind(tagId).first();
+    return Boolean(row);
+  } catch (error) {
+    console.error("[media-core] failed to validate TagID", error);
+    return false;
+  }
 }
