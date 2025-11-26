@@ -31,7 +31,7 @@ export default {
 
 async function handleUpload(request: Request, env: Env): Promise<Response> {
   const input = await parseUploadRequest(request);
-  const rawTag = (input.tag_id ?? "").toString().trim().toUpperCase();
+  const rawTag = input.tagId;
 
   if (!rawTag) {
     return html(renderCapturePage("Missing tag_id field"), { status: 400 });
@@ -48,17 +48,18 @@ async function handleUpload(request: Request, env: Env): Promise<Response> {
 
   const resolvedAction = (await tagLookup.json()) as ResolvedAction;
 
-  // TODO: parse multipart/form-data and stream file bytes rather than sending a placeholder payload.
-  const mediaResponse = await callService(env.MEDIA_CORE, env.MEDIA_CORE_ORIGIN, "/upload", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ tag_id: rawTag, placeholder: true })
-  });
-
+  let mediaRequest: RequestInit;
+  try {
+    mediaRequest = await buildMediaCoreRequest(input);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown upload error";
+    return html(renderCapturePage(message), { status: 400 });
+  }
+  const mediaResponse = await callService(env.MEDIA_CORE, env.MEDIA_CORE_ORIGIN, "/upload", mediaRequest);
   const mediaResult = await mediaResponse.json<Record<string, unknown>>();
 
   console.log(
-    `[pt-photo] stub upload for TagID=${rawTag} => action=${resolvedAction.actionType}, media=${JSON.stringify(mediaResult)}`
+    `[pt-photo] upload flow TagID=${rawTag} => action=${resolvedAction.actionType}, media=${JSON.stringify(mediaResult)}`
   );
 
   // TODO: integrate PII-safe logging + audit-core emission once real uploads are wired in.
@@ -66,7 +67,7 @@ async function handleUpload(request: Request, env: Env): Promise<Response> {
     <p><strong>TagID:</strong> ${rawTag}</p>
     <p><strong>Action:</strong> ${resolvedAction.actionType}</p>
     <p><strong>Media:</strong> ${JSON.stringify(mediaResult)}</p>
-    <p class="todo">TODO: replace stub workflow with real D1/R2 integration.</p>
+    <p class="todo">TODO: persist capture session + binary metadata (D1/R2) and audit trail.</p>
   `;
 
   return html(renderCapturePage("Stub upload complete.", summary));
@@ -90,27 +91,60 @@ async function callService(
   throw new Error(`No binding or fallback origin configured for service path ${path}`);
 }
 
-async function parseUploadRequest(request: Request): Promise<Record<string, unknown>> {
+type UploadInput =
+  | { mode: "form"; tagId: string; file: File | null }
+  | { mode: "json"; tagId: string; placeholder?: boolean };
+
+async function parseUploadRequest(request: Request): Promise<UploadInput> {
   const contentType = request.headers.get("content-type") ?? "";
 
-  try {
-    if (contentType.includes("application/json")) {
-      return await request.json();
+  if (contentType.includes("multipart/form-data")) {
+    const form = await request.formData();
+    const tagId = (form.get("tag_id") ?? "").toString().trim().toUpperCase();
+    const file = form.get("photo");
+    if (!(file instanceof File)) {
+      return { mode: "form", tagId, file: null };
     }
-    if (contentType.includes("application/x-www-form-urlencoded")) {
-      const params = new URLSearchParams(await request.text());
-      return Object.fromEntries(params.entries());
-    }
-    // Basic form parsing without file support yet.
-    if (contentType.includes("multipart/form-data")) {
-      const form = await request.formData();
-      return { tag_id: form.get("tag_id") ?? "" };
-    }
-  } catch (error) {
-    console.warn("[pt-photo] unable to parse upload body", error);
+    return { mode: "form", tagId, file };
   }
 
-  return {};
+  if (contentType.includes("application/x-www-form-urlencoded")) {
+    const params = new URLSearchParams(await request.text());
+    const tagId = (params.get("tag_id") ?? "").toString().trim().toUpperCase();
+    return { mode: "json", tagId, placeholder: true };
+  }
+
+  // Default to JSON for API clients/tools.
+  try {
+    const body = await request.json<Record<string, unknown>>();
+    const tagId = (body.tag_id ?? "").toString().trim().toUpperCase();
+    return { mode: "json", tagId, placeholder: Boolean(body.placeholder) };
+  } catch (error) {
+    console.warn("[pt-photo] unable to parse upload body", error);
+    return { mode: "json", tagId: "" };
+  }
+}
+
+async function buildMediaCoreRequest(input: UploadInput): Promise<RequestInit> {
+  if (input.mode === "form") {
+    if (!input.file) {
+      throw new Error("File required for form submission");
+    }
+
+    const formData = new FormData();
+    formData.append("tag_id", input.tagId);
+    formData.append("photo", input.file);
+    return { method: "POST", body: formData };
+  }
+
+  return {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      tag_id: input.tagId,
+      placeholder: input.placeholder ?? true
+    })
+  };
 }
 
 const html = (body: string, init: ResponseInit = {}): Response =>
@@ -149,14 +183,14 @@ function renderCapturePage(statusMessage = "", extraContent = ""): string {
     <h1>PrivateTag1 Photo Capture MVP</h1>
     <p>This stub demonstrates the control-plane (tag-core) → data-plane (media-core) flow.</p>
     ${statusMessage ? `<div class="status">${statusMessage}</div>` : ""}
-    <form action="/upload" method="post">
+    <form action="/upload" method="post" enctype="multipart/form-data">
       <label for="tag_id">Tag ID</label>
       <input type="text" id="tag_id" name="tag_id" required placeholder="e.g., TESTPHOTO1" />
 
       <label for="photo">Photo</label>
       <input type="file" id="photo" name="photo" accept="image/*" />
 
-      <p class="todo">TODO: send multipart/form-data and stream real files to media-core.</p>
+      <p class="todo">TODO: stream directly to media-core + D1 via durable upload/resume logic.</p>
 
       <button type="submit">Upload (stub)</button>
     </form>
