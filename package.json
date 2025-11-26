@@ -14,6 +14,8 @@
     "seed:tag-core": "pnpm --filter svc/tag-core run seed:local",
     "migrate:media-core": "pnpm --filter svc/media-core run migrate:local",
     "seed:media-core": "pnpm --filter svc/media-core run seed:local",
+    "speckit:check": "pwsh -File ./.specify/scripts/powershell/check-task-prerequisites.ps1",
+    "speckit:new-feature": "pwsh -File ./.specify/scripts/powershell/create-new-feature.ps1",
     "test": "vitest run"
   },
   "devDependencies": {

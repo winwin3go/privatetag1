@@ -28,3 +28,10 @@ and storage primitives that all applications can reuse.
    pnpm seed:media-core
    ```
 5. The pt-photo Worker calls tag-core and media-core via service bindings (or the documented local fallbacks) so you can exercise the entire flow using the stub UI at `/`.
+
+## Spec Kit Workflow
+
+- Commands: `/speckit.constitution`, `/speckit.specify`, `/speckit.clarify`, `/speckit.plan`, `/speckit.tasks`, `/speckit.checklist`, `/speckit.analyze`, `/speckit.implement`.
+- Artifact locations: `specs/<id>-<slug>/` for specs/plans/tasks/checklists.
+- Scripts: `pnpm speckit:check` (prereqs), `pnpm speckit:new-feature` (folder scaffolding).
+- Refer to `docs/spec-kit.md` for the lifecycle and how it maps to apps/svc/pkg.

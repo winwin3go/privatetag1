@@ -1,0 +1,5 @@
+- [ ] Review why the constitution needs change. Link to specs/issues driving it.
+- [ ] Evaluate impact on existing specs/plans/tasks. List any that must be updated.
+- [ ] Update this checklist if the update process changes.
+- [ ] Notify collaborators (pull request summary + chat) describing the change and its rationale.
+- [ ] After merging, run `/speckit.constitution` once to ensure agents ingest the new guardrails.
